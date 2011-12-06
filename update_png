@@ -1,0 +1,89 @@
+#!/bin/sh -fu
+
+. ./settings.sh
+
+######################################################################
+
+update_png_tile(){
+  local x=$1;
+  local y=$2;
+  echo "tile: $x $y"
+  local fig="$fig_dir/t$x-$y.fig"
+  local png="$png_dir/t$x-$y.png"
+
+  [ ! -f "$png" -o "$fig" -nt "$png" ] || return 0
+  calc mag "2^($maxZoom-$sc)"
+  vmap_render --transp_margins 1 --rscale=50000 --mag $mag --google "$x,$y,$sc" "$fig" "$png"
+  [ -e "$png" ] || return 0
+  make_tiles "$x" "$y"
+}
+
+make_tiles(){ # make 256x256 tiles
+  local x=$1;
+  local y=$2;
+
+  local src="$png_dir/t$x-$y.png"
+  local srcSize=$tile_size_px
+  local finalSize=256
+  for zz in $(seq $maxZoom -1 $sc); do
+    echo "create tiles Z${zz}..."
+    local tile_count="$(($srcSize/256))"
+    local tiles="$(mktemp -u tileXXXXXX)"
+    local curSrc
+    local tsBefCrop="$(date +%s)"
+    if [ "$zz" -eq "$maxZoom" ]; then
+      convert "$src" +gravity -crop 256x256  "$tiles-%d.png"
+    else
+      curSrc="$(mktemp -u srcXXXXXX.png)"
+      convert "$src" -resize "${srcSize}x${srcSize}" "$curSrc"
+      convert "$curSrc" +gravity -crop 256x256  "$tiles-%d.png"
+      rm $curSrc
+    fi
+    local tsAftCrop="$(date +%s)"
+    for xx in $(seq 1 $tile_count); do
+      for yy in $(seq 1 $tile_count); do
+        # name of converted tile
+        local n="$(($xx-1 + ($yy-1)*$tile_count))"
+        local png="$tiles-$n.png"
+        # absolute.
+        local ax="$(($x * $tile_count + $xx - 1))"
+        local ay="$(($y * $tile_count + $yy - 1))"
+
+        [ -f "$png" ] || echo "Error: can't find $n-th tile!"
+        # convert "$png" -resize 256x256 "$tile_dir/Z${zz}/${ay}_${ax}.png"
+        local minAlpha="$(convert "$png" -matte -channel A -separate -format "%[fx:image.minima]" info:)"
+        if [ $minAlpha != "1" ]; then
+          local pngopt="$tiles-$n-nq8.png"
+
+          # convert "$png" +dither -colors 256 "$tile_dir/Z${zz}/${ay}_${ax}.png"
+          pngnq "$png" 
+          mv "$pngopt" "$tile_dir/Z${zz}/${ay}_${ax}.png"
+          # mv "$png" "$tile_dir/Z${zz}/${ay}_${ax}-orig.png"
+          if [ $? -ne "0" ]; then
+            echo "Error converting Z${zz}/${ay}_${ax}.png"
+            cp "$png" "$tile_dir/Z${zz}/${ay}_${ax}.png"
+          fi
+        fi
+        rm "$png"
+      done
+    done
+    local tsAftCopy="$(date +%s)"
+    echo "$(($tsAftCrop-$tsBefCrop))" "$(($tsAftCopy-$tsAftCrop))" 
+    srcSize=$(($srcSize/2))
+  done
+}
+
+
+######################################################################
+
+mkdir -p -- "$png_dir" "$tile_dir"
+
+for z in $(seq $sc $maxZoom); do
+  mkdir -p "${tile_dir}/Z${z}"
+done
+
+for x in $(seq $x1 $x2); do
+  for y in $(seq $y1 $y2); do
+    update_png_tile "$x" "$y"
+  done
+done
