@@ -1,17 +1,29 @@
 #!/bin/sh -fu
 
-. ./settings.sh
+if [ $# -ne 0 ]
+then
+  . ./$1
+else
+  . ./settings.sh
+fi
 
 ######################################################################
 
 update_png_tile(){
   local x=$1;
   local y=$2;
-  echo "tile: $x $y"
   local fig="$fig_dir/t$x-$y.fig"
   local png="$png_dir/t$x-$y.png"
 
-  [ ! -f "$png" -o "$fig" -nt "$png" ] || return 0
+  [ -f "$fig" ] || return 0
+  
+  echo "tile: $x $y"
+  
+  if [ -f "$png" -a "$fig" -ot "$png" ]
+  then
+    echo "Up to date"
+    return 0
+  fi
   calc mag "2^($maxZoom-$sc)"
   vmap_render --transp_margins 1 --rscale=50000 --mag $mag --google "$x,$y,$sc" "$fig" "$png"
   [ -e "$png" ] || return 0
@@ -26,7 +38,7 @@ make_tiles(){ # make 256x256 tiles
   local srcSize=$tile_size_px
   local finalSize=256
   for zz in $(seq $maxZoom -1 $sc); do
-    echo "create tiles Z${zz}..."
+    echo "  create tiles Z${zz}..."
     local tile_count="$(($srcSize/256))"
     local tiles="$(mktemp -u tileXXXXXX)"
     local curSrc
@@ -49,7 +61,7 @@ make_tiles(){ # make 256x256 tiles
         local ax="$(($x * $tile_count + $xx - 1))"
         local ay="$(($y * $tile_count + $yy - 1))"
 
-        [ -f "$png" ] || echo "Error: can't find $n-th tile!"
+        [ -f "$png" ] || echo "Error: can't find $n-th tile (${ax},${ay})!"
         # convert "$png" -resize 256x256 "$tile_dir/Z${zz}/${ay}_${ax}.png"
         local minAlpha="$(convert "$png" -matte -channel A -separate -format "%[fx:image.minima]" info:)"
         if [ $minAlpha != "1" ]; then
@@ -68,7 +80,7 @@ make_tiles(){ # make 256x256 tiles
       done
     done
     local tsAftCopy="$(date +%s)"
-    echo "$(($tsAftCrop-$tsBefCrop))" "$(($tsAftCopy-$tsAftCrop))" 
+    echo "Time (split/optimize): $(($tsAftCrop-$tsBefCrop))/$(($tsAftCopy-$tsAftCrop))" 
     srcSize=$(($srcSize/2))
   done
 }

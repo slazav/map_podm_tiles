@@ -1,0 +1,168 @@
+﻿<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title>Map Viewer</title>
+    
+        <style>
+            #saveButton
+            {
+                position:absolute;
+                top:10px;
+                left:50px;
+                z-index:1000;
+            }
+        </style>
+    
+        <script type="text/javascript" src="/thirdparty/js/jquery-1.4.2.min.js"></script>
+        <script type="text/javascript" src="/thirdparty/js/OpenLayers.js"></script>
+    
+        <script>
+            function get_my_url (bounds) {
+                var res = this.map.getResolution();
+                var x = Math.round ((bounds.left - this.maxExtent.left) / (res * this.tileSize.w));
+                var y = Math.round ((this.maxExtent.top - bounds.top) / (res * this.tileSize.h));
+                
+                var z = this.map.getZoom();
+
+                var path = "Z" + z + "/" + y + "_" + x + ".png";
+                var url = this.url;
+                if (url instanceof Array) {
+                    url = this.selectUrl(path, url);
+                }
+                
+                return url + path;
+            }
+            
+            var initPolygon = function()
+            {
+                var coordsLatlon = [
+                    [54, 36],
+                    [54, 39],
+                    [57, 39],
+                    [57, 36],
+                    [54, 36]
+                ]
+                
+                var holeLatlon = [
+                    [55, 37],
+                    [55, 38],
+                    [56, 38],
+                    [56, 37],
+                    [55, 37]
+                ]
+                
+                var transformArray = function(coordsLatlon)
+                {
+                    var coordsMerc = [];
+                    for (var p = 0; p < coordsLatlon.length; p++)
+                    {
+                        var point = new OpenLayers.Geometry.Point(coordsLatlon[p][1], coordsLatlon[p][0]);
+                        point.transform(
+                            new OpenLayers.Projection("EPSG:4326"), // transform from WGS 1984
+                            map.getProjectionObject() // to Spherical Mercator Projection
+                        );
+                        coordsMerc.push(point);
+                    }
+                    
+                    return coordsMerc;
+                }
+                
+                var coordsMerc = transformArray(coordsLatlon);
+                var holeMerc = transformArray(holeLatlon);
+                
+                var outerRing = new OpenLayers.Geometry.LinearRing(coordsMerc);
+                var holeRing = new OpenLayers.Geometry.LinearRing(holeMerc);
+                var polygon = new OpenLayers.Geometry.Polygon([outerRing, holeRing]);
+                return polygon;
+            }
+            
+            
+            $(function()
+            {
+                var MAP_HOST_NAME = '';
+                
+                var slazavLayer = new OpenLayers.Layer.TMS("Slazav",
+                           MAP_HOST_NAME + "/maps/slazav/",
+                           { 'type':'png', 'getURL':get_my_url, transparent: 'true' });
+                           
+                var slazavLayerNew = new OpenLayers.Layer.TMS("SlazavNew",
+                           MAP_HOST_NAME + "/maps/slazav_border/",
+                           { 'type':'png', 'getURL':get_my_url, transparent: 'true' });
+
+                var arbaletLayer = new OpenLayers.Layer.TMS("Arbalet",
+                           MAP_HOST_NAME + "/maps/arbalet/",
+                           { 'type':'png', 'getURL':get_my_url, transparent: 'true' });
+                
+                var osmLayer = new OpenLayers.Layer.OSM();
+
+                var borderLayer = new OpenLayers.Layer.Vector("Map Border", {
+                    renderers: OpenLayers.Layer.Vector.prototype.renderers
+                });
+                
+                
+                var map = new OpenLayers.Map("map_canvas", {
+                    maxExtent: new OpenLayers.Bounds(-20037508.34,-20037508.34,20037508.34,20037508.34),
+                    numZoomLevels:18,
+                    maxResolution:156543.0339,
+                    units:'m',
+                    projection: "EPSG:900913",
+                    displayProjection: new OpenLayers.Projection("EPSG:4326"),
+                    allOverlays: true
+                });
+                
+                map.addLayers([osmLayer, slazavLayerNew, borderLayer]);
+            
+                map.addControl( new OpenLayers.Control.LayerSwitcher() );
+                
+                var mapCenterLonLat = new OpenLayers.LonLat(37.98, 55.78)
+                map.setCenter(mapCenterLonLat.transform(new OpenLayers.Projection("EPSG:4326"), map.getProjectionObject()), 9);
+                
+                $.getJSON("cgi-bin/loadBoundary.py", function(geometry)
+                {
+                    var rings = [];
+                    for (var r = 0; r < geometry.length; r++)
+                    {
+                        var points = [];
+                        for (var p = 0; p < geometry[r].length; p++)
+                            points.push(new OpenLayers.Geometry.Point(geometry[r][p][0], geometry[r][p][1]));
+                        rings.push(new OpenLayers.Geometry.LinearRing(points))
+                    }
+                    
+                    var polygon = new OpenLayers.Geometry.Polygon(rings);
+                    
+                    var multipolygonFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.MultiPolygon([polygon]), null, {fillOpacity: 0.2, fillColor: "#0000ff"});
+                    /*var testFeature = (new OpenLayers.Format.WKT()).read(
+                        "MULTIPOLYGON (((4247597.3005028432000000 7514065.6274999995000000, 4247594.4079857394000000 7514139.5064033419000000, 4248072.9791040421000000 7514065.6274999995000000, 4247597.3005028432000000 7514065.6274999995000000)), ((4250534.5089710187000000 7514065.6274999995000000, 4251652.0994801885000000 7527530.3182936469000000, 4229295.3568767924000000 7541023.8424407048000000, 4229582.5398158161000000 7548993.5969665749000000, 4226661.9154687496000000 7548995.5951766605000000, 4226661.9154687496000000 7592337.1444531251000000, 4304933.4324218752000000 7592337.1444531251000000, 4304933.4324218752000000 7514065.6274999995000000, 4250534.5089710187000000 7514065.6274999995000000)))");*/
+                    borderLayer.addFeatures([multipolygonFeature]);
+                    var modifyControl = new OpenLayers.Control.ModifyFeature(borderLayer);
+                    map.addControl( modifyControl );
+                    modifyControl.mode = OpenLayers.Control.ModifyFeature.RESHAPE;
+                    modifyControl.activate();
+                    
+                    $('#saveButton').click(function()
+                    {
+                        var boundary = [];
+                        for (var r = 0; r < polygon.components.length; r++)
+                        {
+                            boundary[r] = [];
+                            var ringVertices = polygon.components[r].getVertices();
+                            for (var p = 0; p < ringVertices.length; p++)
+                                boundary[r].push([ringVertices[p].x, ringVertices[p].y]);
+                        }
+                        
+                        $.post("cgi-bin/saveBoundary.py", {boundary: JSON.stringify(boundary)}, function(data)
+                        {
+                            alert(data);
+                        });
+                    })
+                })
+                
+            })
+        </script>
+    </head>
+
+    <body style="margin:0; padding:0; overflow:hidden;">
+        <div id="map_canvas" style="width: 100%; height: 100%; margin:0; padding:0; overflow:hidden;"></div>
+        <button id="saveButton" style="position:absolute">Save Boundary</button>
+    </body>
+</html>
