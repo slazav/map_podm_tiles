@@ -1,5 +1,4 @@
 from shapely.geometry import Polygon
-# from pyproj import Proj
 import json
 import sys
 import math
@@ -62,5 +61,3 @@ polyBoundary = Polygon(boundary[0], boundary[1:])
 for x in range(300, 320):
     for y in range(150, 170):
         getTileBoundary(x, y, 9, polyBoundary)
-
-# getTileBoundary(x, y, z)

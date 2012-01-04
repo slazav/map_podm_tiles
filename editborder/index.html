@@ -4,7 +4,7 @@
         <title>Map Viewer</title>
     
         <style>
-            #saveButton
+            .buttons
             {
                 position:absolute;
                 top:10px;
@@ -99,7 +99,6 @@
                     renderers: OpenLayers.Layer.Vector.prototype.renderers
                 });
                 
-                
                 var map = new OpenLayers.Map("map_canvas", {
                     maxExtent: new OpenLayers.Bounds(-20037508.34,-20037508.34,20037508.34,20037508.34),
                     numZoomLevels:18,
@@ -117,43 +116,110 @@
                 var mapCenterLonLat = new OpenLayers.LonLat(37.98, 55.78)
                 map.setCenter(mapCenterLonLat.transform(new OpenLayers.Projection("EPSG:4326"), map.getProjectionObject()), 9);
                 
-                $.getJSON("cgi-bin/loadBoundary.py", function(geometry)
+                $.getJSON("cgi-bin/loadBoundary.py", function(multigeometry)
                 {
-                    var rings = [];
-                    for (var r = 0; r < geometry.length; r++)
+                    
+                    for (var poly = 0; poly < multigeometry.length; poly++)
                     {
-                        var points = [];
-                        for (var p = 0; p < geometry[r].length; p++)
-                            points.push(new OpenLayers.Geometry.Point(geometry[r][p][0], geometry[r][p][1]));
-                        rings.push(new OpenLayers.Geometry.LinearRing(points))
+                        var geometry = multigeometry[poly];
+                        var rings = [];
+                        for (var r = 0; r < geometry.length; r++)
+                        {
+                            var points = [];
+                            for (var p = 0; p < geometry[r].length; p++)
+                                points.push(new OpenLayers.Geometry.Point(geometry[r][p][0], geometry[r][p][1]));
+                            rings.push(new OpenLayers.Geometry.LinearRing(points))
+                        }
+                        
+                        var polygon = new OpenLayers.Geometry.Polygon(rings);
+                        
+                        //var multipolygonFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.MultiPolygon([polygon]), null, {fillOpacity: 0.2, fillColor: "#0000ff"});
+                        var polygonFeature = new OpenLayers.Feature.Vector(polygon, null, {fillOpacity: 0.2, fillColor: "#0000ff"});
+                        borderLayer.addFeatures([polygonFeature]);
                     }
                     
-                    var polygon = new OpenLayers.Geometry.Polygon(rings);
-                    
-                    var multipolygonFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.MultiPolygon([polygon]), null, {fillOpacity: 0.2, fillColor: "#0000ff"});
-                    /*var testFeature = (new OpenLayers.Format.WKT()).read(
-                        "MULTIPOLYGON (((4247597.3005028432000000 7514065.6274999995000000, 4247594.4079857394000000 7514139.5064033419000000, 4248072.9791040421000000 7514065.6274999995000000, 4247597.3005028432000000 7514065.6274999995000000)), ((4250534.5089710187000000 7514065.6274999995000000, 4251652.0994801885000000 7527530.3182936469000000, 4229295.3568767924000000 7541023.8424407048000000, 4229582.5398158161000000 7548993.5969665749000000, 4226661.9154687496000000 7548995.5951766605000000, 4226661.9154687496000000 7592337.1444531251000000, 4304933.4324218752000000 7592337.1444531251000000, 4304933.4324218752000000 7514065.6274999995000000, 4250534.5089710187000000 7514065.6274999995000000)))");*/
-                    borderLayer.addFeatures([multipolygonFeature]);
                     var modifyControl = new OpenLayers.Control.ModifyFeature(borderLayer);
                     map.addControl( modifyControl );
                     modifyControl.mode = OpenLayers.Control.ModifyFeature.RESHAPE;
                     modifyControl.activate();
                     
+                    var addRingControl = new OpenLayers.Control.DrawFeature(borderLayer, OpenLayers.Handler.Polygon);
+                    map.addControl( addRingControl );
+                    addRingControl.events.register("featureadded", {}, function()
+                    {
+                        modifyControl.activate();
+                        addRingControl.deactivate();
+                        selectControl.deactivate();
+                    })
+                    
+                    var selectControl = new OpenLayers.Control.SelectFeature(borderLayer, {
+                        clickout: true,
+                        multiple: false, hover: false
+                    });
+                    borderLayer.events.on({
+                        'featureselected': function(event) {
+                            if (selectControl.active)
+                            {
+                                borderLayer.destroyFeatures([event.feature]);
+                                modifyControl.activate();
+                                addRingControl.deactivate();
+                                selectControl.deactivate();
+                            }
+                        }
+                    });
+
+                    map.addControl( selectControl );
+                    
+                    $('#deleteButton').click(function()
+                    {
+                        modifyControl.deactivate();
+                        addRingControl.deactivate();
+                        selectControl.activate();
+                    });
+                    
                     $('#saveButton').click(function()
                     {
+                        
                         var boundary = [];
-                        for (var r = 0; r < polygon.components.length; r++)
+                        
+                        for (var poly = 0; poly < borderLayer.features.length; poly++)
                         {
-                            boundary[r] = [];
-                            var ringVertices = polygon.components[r].getVertices();
-                            for (var p = 0; p < ringVertices.length; p++)
-                                boundary[r].push([ringVertices[p].x, ringVertices[p].y]);
+                            boundary[poly] = [];
+                            var polygon = borderLayer.features[poly].geometry;
+                            for (var r = 0; r < polygon.components.length; r++)
+                            {
+                                boundary[poly][r] = [];
+                                var ringVertices = polygon.components[r].getVertices();
+                                for (var p = 0; p < ringVertices.length; p++)
+                                    boundary[poly][r].push([ringVertices[p].x, ringVertices[p].y]);
+                            }
                         }
                         
+                        //console.log(boundary);
                         $.post("cgi-bin/saveBoundary.py", {boundary: JSON.stringify(boundary)}, function(data)
                         {
-                            alert(data);
-                        });
+                            if (data.status !== 'ok')
+                            {
+                                alert("Wrong geometry!");
+                                var wrongLayer = new OpenLayers.Layer.Vector("Wrong rectangles", {
+                                    renderers: OpenLayers.Layer.Vector.prototype.renderers
+                                });
+                                map.addLayers([wrongLayer]);
+                                
+                                for (var p = 0; p < data.wrongRectangles.length; p++)
+                                {
+                                    var wrongPoly = (new OpenLayers.Format.WKT()).read(data.wrongRectangles[p]);
+                                    wrongLayer.addFeatures([wrongPoly]);
+                                }
+                            }
+                        }, 'json');
+                    })
+                    
+                    $("#ringButton").click(function()
+                    {
+                        modifyControl.deactivate();
+                        addRingControl.activate();
+                        selectControl.deactivate();
                     })
                 })
                 
@@ -163,6 +229,10 @@
 
     <body style="margin:0; padding:0; overflow:hidden;">
         <div id="map_canvas" style="width: 100%; height: 100%; margin:0; padding:0; overflow:hidden;"></div>
-        <button id="saveButton" style="position:absolute">Save Boundary</button>
+        <div class="buttons">
+            <button id="saveButton">Save boundary</button>
+            <button id="ringButton">New ring</button>
+            <button id="deleteButton">Delete ring</button>
+        </div>
     </body>
 </html>

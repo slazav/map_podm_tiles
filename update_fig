@@ -41,7 +41,7 @@ update_fig_tile(){
     f=$vmap_dir/$i.vmap
     [ -f "$f" ] || continue
     
-    local cropedVmap="$fig_tmp_dir/$i--$x-$y.fig"
+    local cropedVmap="$fig_crop_dir/$i--$x-$y.fig"
     if [ ! -f "$cropedVmap" -o "$cropedVmap" -ot "$f" ]
     then
       vmap_copy -v "$f" -o "$cropedVmap"\
@@ -82,8 +82,7 @@ update_fig_tile(){
 
 ######################################################################
 
-# rm -rf "$fig_tmp_dir"
-mkdir -p -- "$fig_tmp_dir"
+mkdir -p -- "$fig_crop_dir"
 mkdir -p -- "$fig_dir"
 for x in $(seq $x1 $x2); do
   for y in $(seq $y1 $y2); do

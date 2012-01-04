@@ -44,11 +44,11 @@ make_tiles(){ # make 256x256 tiles
     local curSrc
     local tsBefCrop="$(date +%s)"
     if [ "$zz" -eq "$maxZoom" ]; then
-      convert "$src" +gravity -crop 256x256  "$tiles-%d.png"
+      convert "$src" +gravity -crop 256x256  "$tile_tmp_dir/$tiles-%d.png"
     else
       curSrc="$(mktemp -u srcXXXXXX.png)"
       convert "$src" -resize "${srcSize}x${srcSize}" "$curSrc"
-      convert "$curSrc" +gravity -crop 256x256  "$tiles-%d.png"
+      convert "$curSrc" +gravity -crop 256x256  "$tile_tmp_dir/$tiles-%d.png"
       rm $curSrc
     fi
     local tsAftCrop="$(date +%s)"
