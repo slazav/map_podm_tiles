@@ -56,7 +56,7 @@ make_tiles(){ # make 256x256 tiles
       for yy in $(seq 1 $tile_count); do
         # name of converted tile
         local n="$(($xx-1 + ($yy-1)*$tile_count))"
-        local png="$tiles-$n.png"
+        local png="$tile_tmp_dir/$tiles-$n.png"
         # absolute.
         local ax="$(($x * $tile_count + $xx - 1))"
         local ay="$(($y * $tile_count + $yy - 1))"
@@ -65,7 +65,7 @@ make_tiles(){ # make 256x256 tiles
         # convert "$png" -resize 256x256 "$tile_dir/Z${zz}/${ay}_${ax}.png"
         local minAlpha="$(convert "$png" -matte -channel A -separate -format "%[fx:image.minima]" info:)"
         if [ $minAlpha != "1" ]; then
-          local pngopt="$tiles-$n-nq8.png"
+          local pngopt="$tile_tmp_dir/$tiles-$n-nq8.png"
 
           # convert "$png" +dither -colors 256 "$tile_dir/Z${zz}/${ay}_${ax}.png"
           pngnq "$png" 
@@ -88,7 +88,7 @@ make_tiles(){ # make 256x256 tiles
 
 ######################################################################
 
-mkdir -p -- "$png_dir" "$tile_dir"
+mkdir -p -- "$png_dir" "$tile_dir" "$tile_tmp_dir"
 
 for z in $(seq $sc $maxZoom); do
   mkdir -p "${tile_dir}/Z${z}"
