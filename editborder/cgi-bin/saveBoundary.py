@@ -4,6 +4,7 @@ import cgitb
 import cgi
 import json
 import math
+import os.path
 
 from shapely.geometry import Polygon
 from shapely.geometry import MultiPolygon
@@ -71,7 +72,6 @@ for x in range(300, 320):
         res = getTileBoundary(x, y, 9, polyBoundary)
         if (res is not None) and (res[0] != 'OK'):
             wrongPolygons.append(res[1])
-            #print "WRONG: {} {}".format(x, y)
         
 if len(wrongPolygons) > 0:
     wkts = [p.wkt for p in wrongPolygons]
@@ -86,14 +86,16 @@ else:
             res = getTileBoundary(x, y, 9, polyBoundary)
             
             if res is not None:
-                #if res[1] != 'OK':
-                #    print "Error: {} {}".format(x, y)
-                
-                geomFile = open("tiles/{}_{}_{}.txt".format(x, y, 9), "w")
+                filename = "tiles/{0}_{1}_{2}.txt".format(x, y, 9)
                 allCoords = []
                 for p in res[1].exterior.coords:
                     allCoords.extend(googleBingtoWGS84Mercator(p[0], p[1]))
-                geomFile.write(','.join(map(str, allCoords)))
-                geomFile.close()
+                
+                coordsString = ','.join(map(str, allCoords))
+                
+                if  not os.path.exists(filename) or not open(filename, "r").read() == coordsString:
+                    geomFile = open(filename, "w")
+                    geomFile.write(coordsString)
+                    geomFile.close()
                 
     print json.dumps({'status': 'ok'})
