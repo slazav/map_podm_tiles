@@ -13,7 +13,14 @@ update_png_tile(){
   local x=$1;
   local y=$2;
   local fig="$fig_dir/t$x-$y.fig"
-  local png="$png_dir/t$x-$y.png"
+  local png="$png_dir/t$x-${y}_opaque.png"
+  local png32="$png_dir/t$x-${y}_32.png"
+  local pngt="$png_dir/t$x-$y.png"
+
+  if [ -z "$use_edited_border" ]; then
+    png="$pngt"
+  fi
+
 
   [ -f "$fig" ] || return 0
   
@@ -27,6 +34,18 @@ update_png_tile(){
   calc mag "2^($maxZoom-$sc)"
   vmap_render --transp_margins 1 --rscale=50000 --mag $mag --google "$x,$y,$sc" "$fig" "$png"
   [ -e "$png" ] || return 0
+
+  if [ -n "$use_edited_border" ]; then
+    # crop image according to boundary
+    node "editborder/crop_tile.js" "editborder/boundary.json" "$png" "$png32" "$x" "$y" "$sc" "$maxZoom"
+
+    #threshold is used to binarize transparency channel: we have only one color for transparency in palette
+    convert "$png32" -channel A -threshold 99% +dither -remap palette/palette.png "$pngt"
+  else
+    convert "$png" +dither -remap palette/palette.png "$pngt"
+  fi
+
+
   make_tiles "$x" "$y"
 }
 
@@ -44,11 +63,11 @@ make_tiles(){ # make 256x256 tiles
     local curSrc
     local tsBefCrop="$(date +%s)"
     if [ "$zz" -eq "$maxZoom" ]; then
-      convert "$src" +gravity -crop 256x256  "$tile_tmp_dir/$tiles-%d.png"
+      convert "$src" +gravity -crop 256x256 "$tile_tmp_dir/$tiles-%d.png"
     else
       curSrc="$(mktemp -u srcXXXXXX.png)"
       convert "$src" -resize "${srcSize}x${srcSize}" "$curSrc"
-      convert "$curSrc" +gravity -crop 256x256  "$tile_tmp_dir/$tiles-%d.png"
+      convert "$curSrc" +gravity -crop 256x256 "$tile_tmp_dir/$tiles-%d.png"
       rm $curSrc
     fi
     local tsAftCrop="$(date +%s)"
@@ -62,19 +81,9 @@ make_tiles(){ # make 256x256 tiles
         local ay="$(($y * $tile_count + $yy - 1))"
 
         [ -f "$png" ] || echo "Error: can't find $n-th tile (${ax},${ay})!"
-        # convert "$png" -resize 256x256 "$tile_dir/Z${zz}/${ay}_${ax}.png"
         local minAlpha="$(convert "$png" -matte -channel A -separate -format "%[fx:image.minima]" info:)"
         if [ $minAlpha != "1" ]; then
-          local pngopt="$tile_tmp_dir/$tiles-$n-nq8.png"
-
-          # convert "$png" +dither -colors 256 "$tile_dir/Z${zz}/${ay}_${ax}.png"
-          pngnq "$png" 
-          mv "$pngopt" "$tile_dir/Z${zz}/${ay}_${ax}.png"
-          # mv "$png" "$tile_dir/Z${zz}/${ay}_${ax}-orig.png"
-          if [ $? -ne "0" ]; then
-            echo "Error converting Z${zz}/${ay}_${ax}.png"
-            cp "$png" "$tile_dir/Z${zz}/${ay}_${ax}.png"
-          fi
+          cp "$png" "$tile_dir/Z${zz}/${ay}_${ax}.png"
         fi
         rm "$png"
       done

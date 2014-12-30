@@ -1,0 +1,9 @@
+#!/bin/sh -fu
+
+../../mapsoft/programs/mapsoft_vmap -o legend.vmap --legend mmb
+../../mapsoft/vector/vmap3/vmap_render legend.vmap legend.png 
+# convert legend.png -resize 50% legend.png
+# convert legend.png -colors 255 -unique-colors png32:palette_tmp.png
+pngtopnm legend.png | pnmscale 0.5 | pnmcolormap -sort 255 > palette_tmp.pnm
+convert palette_tmp.pnm png32:palette_tmp.png
+convert palette_tmp.png -gravity southeast -background transparent -splice 1x0 palette.png

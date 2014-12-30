@@ -16,11 +16,11 @@ update_fig_tile(){
   
   echo "tile: $x $y"
   
-  if [ -n "$use_edited_border" -a ! -f "$borderFilename" ]
-  then
-    echo "No border - skipping!"
-    return 0;
-  fi
+  # if [ -n "$use_edited_border" -a ! -f "$borderFilename" ]
+  # then
+  #   echo "No border - skipping!"
+  #   return 0;
+  # fi
 
   local x1 x2 y1 y2 dx dy
 
@@ -52,12 +52,12 @@ update_fig_tile(){
     local cropedVmap="$fig_crop_dir/$i--$x-$y.fig"
     if [ ! -f "$cropedVmap" -o "$cropedVmap" -ot "$f" ]
     then
-      vmap_copy -v "$f" -o "$cropedVmap"\
+      mapsoft_vmap -v "$f" -o "$cropedVmap"\
       --range_datum=sphere --range_proj=merc --range="$geom"\
       --range_action=crop_spl
     fi
 
-    [ -f "$fig" -a "$f" -ot "$fig" -a "$borderFilename" -ot "$fig" ] || need_update=1
+    [ -f "$fig" -a "$f" -ot "$fig" ] || need_update=1
     
     src="$src $cropedVmap"
   done
@@ -72,20 +72,21 @@ update_fig_tile(){
   brd=
   # create fig files if needed
   if [ ! -f "$fig" ]; then
+    echo "$x,$y,$sc"
     mapsoft_geofig create --rscale 50000 --google "$x,$y,$sc" -o "$fig"
     my_src="$src"
-    if [ -z "$use_edited_border" ]; then
+    # if [ -z "$use_edited_border" ]; then
       brd="--set_brd_from_range"
-    fi
+    # fi
   else
     # use old labels if fig file exists:
     my_src="--skip_labels $src $fig --read_labels --skip_all"
   fi
   
   externalBorder=
-  if [ -n "$use_edited_border" ]; then
-    externalBorder="--set_brd $(cat $borderFilename)"
-  fi
+  #if [ -n "$use_edited_border" ]; then
+  #  externalBorder="--set_brd $(cat $borderFilename)"
+  #fi
   
   join_objects_param=
   if [ -n "$join_objects" ]; then
@@ -93,7 +94,7 @@ update_fig_tile(){
   fi
   
   # copy vmaps
-  vmap_copy -v $my_src --out $fig\
+  mapsoft_vmap -v $my_src --out $fig\
    --name "$(basename $fig .fig)"\
    --range_datum=sphere --range_proj=merc --range="$geom"\
    --range_action=crop_spl $brd $externalBorder $join_objects_param

@@ -4,235 +4,94 @@
         <title>Map Viewer</title>
     
         <style>
-            .buttons
-            {
-                position:absolute;
-                top:10px;
-                left:50px;
-                z-index:1000;
+            html, body, #map_canvas {
+                height: 100%;
+                margin: 0px;
+            }
+            .save-button {
+                position: absolute;
+                top: 20px;
+                left: 100px;
             }
         </style>
     
-        <script type="text/javascript" src="/thirdparty/js/jquery-1.4.2.min.js"></script>
-        <script type="text/javascript" src="/thirdparty/js/OpenLayers.js"></script>
-    
-        <script>
-            function get_my_url (bounds) {
-                var res = this.map.getResolution();
-                var x = Math.round ((bounds.left - this.maxExtent.left) / (res * this.tileSize.w));
-                var y = Math.round ((this.maxExtent.top - bounds.top) / (res * this.tileSize.h));
-                
-                var z = this.map.getZoom();
+        <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" />
+        <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.2.3/leaflet.draw.css" />
+        <script src="https://code.jquery.com/jquery-2.1.1.js"></script>
 
-                var path = "Z" + z + "/" + y + "_" + x + ".png";
-                var url = this.url;
-                if (url instanceof Array) {
-                    url = this.selectUrl(path, url);
-                }
-                
-                return url + path;
-            }
-            
-            var initPolygon = function()
-            {
-                var coordsLatlon = [
-                    [54, 36],
-                    [54, 39],
-                    [57, 39],
-                    [57, 36],
-                    [54, 36]
-                ]
-                
-                var holeLatlon = [
-                    [55, 37],
-                    [55, 38],
-                    [56, 38],
-                    [56, 37],
-                    [55, 37]
-                ]
-                
-                var transformArray = function(coordsLatlon)
-                {
-                    var coordsMerc = [];
-                    for (var p = 0; p < coordsLatlon.length; p++)
-                    {
-                        var point = new OpenLayers.Geometry.Point(coordsLatlon[p][1], coordsLatlon[p][0]);
-                        point.transform(
-                            new OpenLayers.Projection("EPSG:4326"), // transform from WGS 1984
-                            map.getProjectionObject() // to Spherical Mercator Projection
-                        );
-                        coordsMerc.push(point);
-                    }
-                    
-                    return coordsMerc;
-                }
-                
-                var coordsMerc = transformArray(coordsLatlon);
-                var holeMerc = transformArray(holeLatlon);
-                
-                var outerRing = new OpenLayers.Geometry.LinearRing(coordsMerc);
-                var holeRing = new OpenLayers.Geometry.LinearRing(holeMerc);
-                var polygon = new OpenLayers.Geometry.Polygon([outerRing, holeRing]);
-                return polygon;
-            }
-            
-            
+        <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+        <script src="http://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/0.2.3/leaflet.draw-src.js"></script>
+        
+        <script>
+ 
             $(function()
             {
-                var MAP_HOST_NAME = '';
-                
-                var slazavLayer = new OpenLayers.Layer.TMS("Slazav",
-                           MAP_HOST_NAME + "/maps/slazav/",
-                           { 'type':'png', 'getURL':get_my_url, transparent: 'true' });
-                           
-                var slazavLayerNew = new OpenLayers.Layer.TMS("SlazavNew",
-                           MAP_HOST_NAME + "/maps/slazav_border/",
-                           { 'type':'png', 'getURL':get_my_url, transparent: 'true' });
-
-                var arbaletLayer = new OpenLayers.Layer.TMS("Arbalet",
-                           MAP_HOST_NAME + "/maps/arbalet/",
-                           { 'type':'png', 'getURL':get_my_url, transparent: 'true' });
-                
-                var osmLayer = new OpenLayers.Layer.OSM();
-
-                var borderLayer = new OpenLayers.Layer.Vector("Map Border", {
-                    renderers: OpenLayers.Layer.Vector.prototype.renderers
+                var map = L.map('map_canvas', {
+                    center: [55.78, 37.98],
+                    zoom: 9
                 });
-                
-                var map = new OpenLayers.Map("map_canvas", {
-                    maxExtent: new OpenLayers.Bounds(-20037508.34,-20037508.34,20037508.34,20037508.34),
-                    numZoomLevels:18,
-                    maxResolution:156543.0339,
-                    units:'m',
-                    projection: "EPSG:900913",
-                    displayProjection: new OpenLayers.Projection("EPSG:4326"),
-                    allOverlays: true
-                });
-                
-                map.addLayers([osmLayer, slazavLayerNew, borderLayer]);
-            
-                map.addControl( new OpenLayers.Control.LayerSwitcher() );
-                
-                var mapCenterLonLat = new OpenLayers.LonLat(37.98, 55.78)
-                map.setCenter(mapCenterLonLat.transform(new OpenLayers.Projection("EPSG:4326"), map.getProjectionObject()), 9);
-                
-                $.getJSON("cgi-bin/loadBoundary.py", function(multigeometry)
-                {
-                    
-                    for (var poly = 0; poly < multigeometry.length; poly++)
-                    {
-                        var geometry = multigeometry[poly];
-                        var rings = [];
-                        for (var r = 0; r < geometry.length; r++)
-                        {
-                            var points = [];
-                            for (var p = 0; p < geometry[r].length; p++)
-                                points.push(new OpenLayers.Geometry.Point(geometry[r][p][0], geometry[r][p][1]));
-                            rings.push(new OpenLayers.Geometry.LinearRing(points))
-                        }
-                        
-                        var polygon = new OpenLayers.Geometry.Polygon(rings);
-                        
-                        //var multipolygonFeature = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.MultiPolygon([polygon]), null, {fillOpacity: 0.2, fillColor: "#0000ff"});
-                        var polygonFeature = new OpenLayers.Feature.Vector(polygon, null, {fillOpacity: 0.2, fillColor: "#0000ff"});
-                        borderLayer.addFeatures([polygonFeature]);
-                    }
-                    
-                    var modifyControl = new OpenLayers.Control.ModifyFeature(borderLayer);
-                    map.addControl( modifyControl );
-                    modifyControl.mode = OpenLayers.Control.ModifyFeature.RESHAPE;
-                    modifyControl.activate();
-                    
-                    var addRingControl = new OpenLayers.Control.DrawFeature(borderLayer, OpenLayers.Handler.Polygon);
-                    map.addControl( addRingControl );
-                    addRingControl.events.register("featureadded", {}, function()
-                    {
-                        modifyControl.activate();
-                        addRingControl.deactivate();
-                        selectControl.deactivate();
-                    })
-                    
-                    var selectControl = new OpenLayers.Control.SelectFeature(borderLayer, {
-                        clickout: true,
-                        multiple: false, hover: false
-                    });
-                    borderLayer.events.on({
-                        'featureselected': function(event) {
-                            if (selectControl.active)
-                            {
-                                borderLayer.destroyFeatures([event.feature]);
-                                modifyControl.activate();
-                                addRingControl.deactivate();
-                                selectControl.deactivate();
-                            }
-                        }
-                    });
 
-                    map.addControl( selectControl );
-                    
-                    $('#deleteButton').click(function()
-                    {
-                        modifyControl.deactivate();
-                        addRingControl.deactivate();
-                        selectControl.activate();
-                    });
-                    
-                    $('#saveButton').click(function()
-                    {
-                        
-                        var boundary = [];
-                        
-                        for (var poly = 0; poly < borderLayer.features.length; poly++)
-                        {
-                            boundary[poly] = [];
-                            var polygon = borderLayer.features[poly].geometry;
-                            for (var r = 0; r < polygon.components.length; r++)
-                            {
-                                boundary[poly][r] = [];
-                                var ringVertices = polygon.components[r].getVertices();
-                                for (var p = 0; p < ringVertices.length; p++)
-                                    boundary[poly][r].push([ringVertices[p].x, ringVertices[p].y]);
-                            }
-                        }
-                        
-                        //console.log(boundary);
-                        $.post("cgi-bin/saveBoundary.py", {boundary: JSON.stringify(boundary)}, function(data)
-                        {
-                            if (data.status !== 'ok')
-                            {
-                                alert("Wrong geometry!");
-                                var wrongLayer = new OpenLayers.Layer.Vector("Wrong rectangles", {
-                                    renderers: OpenLayers.Layer.Vector.prototype.renderers
-                                });
-                                map.addLayers([wrongLayer]);
-                                
-                                for (var p = 0; p < data.wrongRectangles.length; p++)
-                                {
-                                    var wrongPoly = (new OpenLayers.Format.WKT()).read(data.wrongRectangles[p]);
-                                    wrongLayer.addFeatures([wrongPoly]);
+
+                var MAP_HOST_NAME = '../result/tiles_border';
+                var borderLayer = L.tileLayer(MAP_HOST_NAME + '/Z{z}/{y}_{x}.png').addTo(map);
+
+                $.ajax({
+                    crossDomain: true,
+                    url: 'http://localhost:3001/get',
+                    dataType: 'json'
+                }).then(function(boundary) {
+                    console.log(boundary);
+                    var rings = L.geoJson(boundary).addTo(map);
+                    var drawControl = new L.Control.Draw({
+                        draw: {
+                            polyline: null,
+                            circle: null,
+                            rectangle: null,
+                            marker: null,
+                            polygon: {
+                                shapeOptions: {
+                                    color: 'blue',
+                                    fill: false
                                 }
                             }
-                        }, 'json');
+                        },
+                        edit: {
+                            featureGroup: rings,
+                            edit: {
+                                selectedPathOptions: {
+                                    color: 'blue',
+                                    fill: false
+                                }
+                            }
+                        }
+
+                    }).addTo(map);
+
+                    map.on('draw:created', function(e) {
+                        rings.addLayer(e.layer);
+                        console.log(JSON.stringify(rings.toGeoJSON()));
                     })
-                    
-                    $("#ringButton").click(function()
-                    {
-                        modifyControl.deactivate();
-                        addRingControl.activate();
-                        selectControl.deactivate();
+
+                    $('.save-button').click(function() {
+                        var formData = new FormData();
+                        formData.append('border', JSON.stringify(rings.toGeoJSON()));
+                        $.ajax({
+                            url: 'http://localhost:3001/save',
+                            crossDomain: true,
+                            type: 'post',
+                            contentType: false,
+                            processData: false,
+                            data: formData 
+                        });
                     })
                 })
-                
+
             })
         </script>
     </head>
 
-    <body style="margin:0; padding:0; overflow:hidden;">
-        <div id="map_canvas" style="width: 100%; height: 100%; margin:0; padding:0; overflow:hidden;"></div>
-        <div class="buttons">
-            <button id="saveButton">Save boundary</button>
-            <button id="ringButton">New ring</button>
-            <button id="deleteButton">Delete ring</button>
-        </div>
+    <body>
+        <div id="map_canvas"></div>
+        <button class="save-button">Save</button>
     </body>
 </html>

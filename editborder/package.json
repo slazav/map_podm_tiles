@@ -1,0 +1,11 @@
+{
+    "name": "editborder",
+    "version": "0.0.1",
+    "dependencies": {
+        "express": "~4.10.4",
+        "cors": "~2.5.2",
+        "canvas": "~1.1.6",
+        "proj4": "~2.3.3",
+        "multer": "~0.1.6"
+    }
+}

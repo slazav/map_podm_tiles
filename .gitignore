@@ -1,2 +1,5 @@
 settings*.sh
 result
+palette/legend*
+palette/palette*
+editborder/node_modules
