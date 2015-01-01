@@ -12,7 +12,8 @@ tile_dir=./result/tiles_border
 tile_tmp_dir=./result/tiles_tmp
 border_dir=
 
-use_edited_border=
+debug_files=
+use_edited_border=1
 join_objects=
 
 nom_rscale=100000 # just to get source map names

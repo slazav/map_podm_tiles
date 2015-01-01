@@ -12,9 +12,9 @@ tile_dir=./result/tiles
 tile_tmp_dir=./result/tiles_tmp
 border_dir=./editborder/cgi-bin/tiles
 
+debug_files=
 use_edited_border=1
 join_objects=1
-#join_objects=
 
 nom_rscale=100000 # just to get source map names
 fig_rscale=89415 # scale in google proj units / m = 50000/cos(56d)

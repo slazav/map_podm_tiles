@@ -13,9 +13,17 @@ update_png_tile(){
   local x=$1;
   local y=$2;
   local fig="$fig_dir/t$x-$y.fig"
-  local png="$png_dir/t$x-${y}_opaque.png"
-  local png32="$png_dir/t$x-${y}_32.png"
+
   local pngt="$png_dir/t$x-$y.png"
+
+  if [ -n "$debug_files" ]
+  then
+    local png="$png_dir/t$x-${y}_opaque.png"
+    local png32="$png_dir/t$x-${y}_32.png"
+  else
+    local png="$pngt"
+    local png32="$pngt"
+  fi
 
   if [ -z "$use_edited_border" ]; then
     png="$pngt"
@@ -24,9 +32,9 @@ update_png_tile(){
 
   [ -f "$fig" ] || return 0
   
-  echo "tile: $x $y"
+  echo "Render tile: $x $y"
   
-  if [ -f "$png" -a "$fig" -ot "$png" ]
+  if [ -f "$pngt" -a "$fig" -ot "$pngt" ]
   then
     echo "Up to date"
     return 0
@@ -36,6 +44,7 @@ update_png_tile(){
   [ -e "$png" ] || return 0
 
   if [ -n "$use_edited_border" ]; then
+    echo "Crop tile"
     # crop image according to boundary
     node "editborder/crop_tile.js" "editborder/boundary.json" "$png" "$png32" "$x" "$y" "$sc" "$maxZoom"
 
@@ -61,14 +70,22 @@ make_tiles(){ # make 256x256 tiles
     local tile_count="$(($srcSize/256))"
     local tiles="$(mktemp -u tileXXXXXX)"
     local curSrc
+    local prev_resized
     local tsBefCrop="$(date +%s)"
     if [ "$zz" -eq "$maxZoom" ]; then
       convert "$src" +gravity -crop 256x256 "$tile_tmp_dir/$tiles-%d.png"
     else
-      curSrc="$(mktemp -u srcXXXXXX.png)"
-      convert "$src" -resize "${srcSize}x${srcSize}" "$curSrc"
+      # curSrc="$(mktemp -u srcXXXXXX.png)"
+      prev_resized="$png_dir/t$x-$y-$(($zz+1)).png"
+      curSrc="$png_dir/t$x-$y-$zz.png"
+      if [ -f $prev_resized ]
+      then
+        convert "$prev_resized" -resize "${srcSize}x${srcSize}" "$curSrc"
+      else
+        convert "$src" -resize "${srcSize}x${srcSize}" "$curSrc"
+      fi
       convert "$curSrc" +gravity -crop 256x256 "$tile_tmp_dir/$tiles-%d.png"
-      rm $curSrc
+      # rm $curSrc
     fi
     local tsAftCrop="$(date +%s)"
     for xx in $(seq 1 $tile_count); do
@@ -92,6 +109,7 @@ make_tiles(){ # make 256x256 tiles
     echo "Time (split/optimize): $(($tsAftCrop-$tsBefCrop))/$(($tsAftCopy-$tsAftCrop))" 
     srcSize=$(($srcSize/2))
   done
+  find "$png_dir" -name "t$x-$y-*.png" -delete
 }
 
 
