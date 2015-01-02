@@ -78,12 +78,13 @@ make_tiles(){ # make 256x256 tiles
       # curSrc="$(mktemp -u srcXXXXXX.png)"
       prev_resized="$png_dir/t$x-$y-$(($zz+1)).png"
       curSrc="$png_dir/t$x-$y-$zz.png"
-      if [ -f $prev_resized ]
-      then
-        convert "$prev_resized" -resize "${srcSize}x${srcSize}" "$curSrc"
-      else
-        convert "$src" -resize "${srcSize}x${srcSize}" "$curSrc"
-      fi
+      [ -f $prev_resized ] || prev_resized="$src"
+      
+      convert "$prev_resized" -resize "${srcSize}x${srcSize}" \
+        -channel A -threshold 99% \
+        +dither -remap palette/palette.png \
+        "$curSrc"
+      
       convert "$curSrc" +gravity -crop 256x256 "$tile_tmp_dir/$tiles-%d.png"
       # rm $curSrc
     fi
