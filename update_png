@@ -48,9 +48,11 @@ update_png_tile(){
     # crop image according to boundary
     node "editborder/crop_tile.js" "editborder/boundary.json" "$png" "$png32" "$x" "$y" "$sc" "$maxZoom"
 
+    echo "Apply palette"
     #threshold is used to binarize transparency channel: we have only one color for transparency in palette
     convert "$png32" -channel A -threshold 99% +dither -remap palette/palette.png "$pngt"
   else
+    echo "Apply palette"
     convert "$png" +dither -remap palette/palette.png "$pngt"
   fi
 
@@ -73,7 +75,7 @@ make_tiles(){ # make 256x256 tiles
     local prev_resized
     local tsBefCrop="$(date +%s)"
     if [ "$zz" -eq "$maxZoom" ]; then
-      convert "$src" +gravity -crop 256x256 "$tile_tmp_dir/$tiles-%d.png"
+      convert "$src" +gravity -crop 256x256 +repage "$tile_tmp_dir/$tiles-%d.png"
     else
       # curSrc="$(mktemp -u srcXXXXXX.png)"
       prev_resized="$png_dir/t$x-$y-$(($zz+1)).png"
@@ -85,7 +87,7 @@ make_tiles(){ # make 256x256 tiles
         +dither -remap palette/palette.png \
         "$curSrc"
       
-      convert "$curSrc" +gravity -crop 256x256 "$tile_tmp_dir/$tiles-%d.png"
+      convert "$curSrc" +gravity -crop 256x256 +repage "$tile_tmp_dir/$tiles-%d.png"
       # rm $curSrc
     fi
     local tsAftCrop="$(date +%s)"
